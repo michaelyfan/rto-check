@@ -1,7 +1,44 @@
+import { useState, type ChangeEvent } from "react";
 import logoDark from "./logo-dark.svg";
 import logoLight from "./logo-light.svg";
+import { DatePicker, DatePickerInput } from '@mantine/dates';
+import { getCompliance, type GetComplianceResult, type DateRange } from "~/utils/compliance";
 
 export function Welcome() {
+  // TODO: support locale input
+  const dateFormatter = new Intl.DateTimeFormat();
+
+  const [calculationDate, setCalculationDate] = useState<string>('2025-07-27');
+  const [inOfficeDays, setInOfficeDays] = useState<string[]>([]);
+  const [userHasSubmitted, setUserHasSubmitted] = useState<boolean>(false);
+  const [alignment, setAlignment] = useState<GetComplianceResult>({
+    isCompliant: false,
+    includedWeeks: [],
+    period: {
+      start: new Date(),
+      end: new Date()
+    }
+  });
+
+  const handleChangeCalculationDate = (d: string | null) => {
+    console.log(d);
+    setCalculationDate(d || '2025-07-27');
+  }
+
+  const handleSubmit = () => {
+    console.log(calculationDate)
+    console.log(inOfficeDays)
+    const GetComplianceResult: GetComplianceResult = getCompliance(
+      new Date(calculationDate),
+      inOfficeDays.map(dateString => new Date(dateString)),
+      12
+    )
+    
+    setUserHasSubmitted(true);
+    setAlignment(GetComplianceResult);
+  }
+
+  const {isCompliant, period, includedWeeks} = alignment;
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
@@ -19,27 +56,52 @@ export function Welcome() {
             />
           </div>
         </header>
-        <div className="max-w-[300px] w-full space-y-6 px-4">
-          <nav className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700 space-y-4">
-            <p className="leading-6 text-gray-700 dark:text-gray-200 text-center">
-              What&apos;s next?
-            </p>
-            <ul>
-              {resources.map(({ href, text, icon }) => (
-                <li key={href}>
-                  <a
-                    className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {icon}
-                    {text}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+        <div>
+          <p>Select calculation date:</p>
+
+          <DatePickerInput
+            clearable={false}
+            label="Pick date"
+            placeholder="Pick date"
+            value={calculationDate}
+            onChange={handleChangeCalculationDate}
+          />
+        </div>
+        <div>
+          <p>Select in-office days:</p>
+          <DatePicker type="multiple" value={inOfficeDays} onChange={setInOfficeDays} />
+        </div>
+        <div>
+          <button type="button" onClick={handleSubmit}>Do I meet the policy?</button>
+        </div>
+        <div>
+          {
+            userHasSubmitted && (
+              isCompliant
+                ? <p>You meet the policy!</p>
+                : <p>You don't meet the policy. Uh oh!</p>
+            )
+          }
+          <br />
+          {
+            userHasSubmitted && (
+              <p>Period: {dateFormatter.format(period.start)} - {dateFormatter.format(period.end)}</p>
+            )
+          }
+          <br />
+          {
+            userHasSubmitted && 
+              <>
+                <p>Dates used:</p>
+                <ul>
+                  {
+                    includedWeeks.map((dateRange: DateRange) => (
+                      <li>{dateFormatter.format(dateRange.start)} - {dateFormatter.format(dateRange.end)}</li>
+                    ))
+                  }
+                </ul>
+              </>
+          }
         </div>
       </div>
     </main>
