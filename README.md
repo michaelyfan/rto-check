@@ -1,3 +1,33 @@
+# RTO Calculator
+
+## TODOs
+
+- clean up getCompliance
+- fully explain all the weeks in the compliance period. includedWeeks should be converted to `weeks` { included: boolean, includedDays: Date[], so that it is used to explain }
+- do your dates handle time zones?
+- prettification (consider a UI library like Mantine)
+- at this point, start component tests
+- configuration page with cookies
+  - average-days-per-week option
+  - "coming soon!" strict-days-per-week option
+  - drop-lowest-weeks option (make sure )
+  - (advanced feature): compliance period option
+  - (advanced feature): compliance period end date (does it consider current week?)
+- more configuration:
+  - add a note saying, if your RTO mandate is full-time, or strict-days-per-week, you probably don't need this tool
+  - support strict-days-per-week option
+- authentication + user data
+- ESlint
+- testing with Cypress
+- (theory) what is Vite?
+- housekeeping:
+  - favicon
+  - README
+  - "calculation date" is a terrible name
+
+
+---
+
 # Welcome to React Router!
 
 A modern, production-ready template for building full-stack React applications using React Router.

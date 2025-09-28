@@ -1,5 +1,5 @@
 {
-  "name": "rto-calculator",
+  "name": "rto-check",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,12 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
+    "@mantine/core": "^8.3.2",
+    "@mantine/dates": "^8.3.2",
+    "@mantine/hooks": "^8.3.2",
     "@react-router/node": "^7.9.2",
     "@react-router/serve": "^7.9.2",
+    "dayjs": "^1.11.18",
     "isbot": "^5.1.31",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
