@@ -1,15 +1,19 @@
-import { useState, type ChangeEvent } from "react";
-import logoDark from "./logo-dark.svg";
-import logoLight from "./logo-light.svg";
+import { useState, useEffect, useRef, useCallback, type ChangeEvent } from "react";
 import { DatePicker, DatePickerInput } from '@mantine/dates';
+import { Button } from '@mantine/core';
 import { getCompliance, type GetComplianceResult, type DateRange } from "~/utils/compliance";
+import dayjs from "dayjs";
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore' // ES 2015
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
 
 export function Welcome() {
   // TODO: support locale input
   const dateFormatter = new Intl.DateTimeFormat();
 
-  const [calculationDate, setCalculationDate] = useState<string>('2025-07-27');
-  const [inOfficeDays, setInOfficeDays] = useState<string[]>([]);
+  const [calculationDate, setCalculationDate] = useState<string>(dayjs().format('YYYY-MM-DD'));
+  const [inOfficeDays, setInOfficeDays] = useState<string[]>([]); // mantine uses the format YYYY-MM-DD ex. 2026-01-07
   const [userHasSubmitted, setUserHasSubmitted] = useState<boolean>(false);
   const [alignment, setAlignment] = useState<GetComplianceResult>({
     isCompliant: false,
@@ -19,6 +23,26 @@ export function Welcome() {
       end: new Date()
     }
   });
+
+  const saveToLocalStorage = useCallback(() => {
+    localStorage.setItem('calculationDate', calculationDate);
+    localStorage.setItem('inOfficeDays', JSON.stringify(inOfficeDays));
+  }, [calculationDate, inOfficeDays]);
+
+  useEffect(() => {
+    const savedCalcDate = localStorage.getItem('calculationDate');
+    const savedInOfficeDays = localStorage.getItem('inOfficeDays');
+    if (savedCalcDate) setCalculationDate(savedCalcDate);
+    if (savedInOfficeDays) setInOfficeDays(JSON.parse(savedInOfficeDays));
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveToLocalStorage();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveToLocalStorage]);
 
   const handleChangeCalculationDate = (d: string | null) => {
     console.log(d);
@@ -38,24 +62,18 @@ export function Welcome() {
     setAlignment(GetComplianceResult);
   }
 
+  const countInOfficeDaysInRange = (dateRange: DateRange): number => {
+    const { start, end } = dateRange;
+    return inOfficeDays.filter(dayStr => {
+      const day = dayjs(dayStr);
+      return day.isSameOrAfter(dayjs(start), 'day') && day.isSameOrBefore(dayjs(end), 'day');
+    }).length;
+  }
+
   const {isCompliant, period, includedWeeks} = alignment;
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
-        <header className="flex flex-col items-center gap-9">
-          <div className="w-[500px] max-w-[100vw] p-4">
-            <img
-              src={logoLight}
-              alt="React Router"
-              className="block w-full dark:hidden"
-            />
-            <img
-              src={logoDark}
-              alt="React Router"
-              className="hidden w-full dark:block"
-            />
-          </div>
-        </header>
         <div>
           <p>Select calculation date:</p>
 
@@ -69,7 +87,15 @@ export function Welcome() {
         </div>
         <div>
           <p>Select in-office days:</p>
-          <DatePicker type="multiple" value={inOfficeDays} onChange={setInOfficeDays} />
+          <DatePicker type="multiple" firstDayOfWeek={0} value={inOfficeDays} onChange={setInOfficeDays} />
+          <div style={{ marginTop: '10px' }}>
+            <Button variant="filled" color="red" onClick={() => {
+              if (window.confirm('Are you sure you want to clear all selected dates?')) {
+                setInOfficeDays([]);
+                setCalculationDate(dayjs().format('YYYY-MM-DD'));
+              }
+            }}>Clear All Dates</Button>
+          </div>
         </div>
         <div>
           <button type="button" onClick={handleSubmit}>Do I meet the policy?</button>
@@ -80,6 +106,12 @@ export function Welcome() {
               isCompliant
                 ? <p>You meet the policy!</p>
                 : <p>You don't meet the policy. Uh oh!</p>
+            )
+          }
+          {
+            userHasSubmitted && (
+              // TODO -- there is a bug with this day calculation -- need to add to calculation response and use instead of relying on live state
+              <p>Total in-office days: {inOfficeDays.length}</p>
             )
           }
           <br />
@@ -95,9 +127,12 @@ export function Welcome() {
                 <p>Dates used:</p>
                 <ul>
                   {
-                    includedWeeks.map((dateRange: DateRange) => (
-                      <li>{dateFormatter.format(dateRange.start)} - {dateFormatter.format(dateRange.end)}</li>
-                    ))
+                    includedWeeks.map((dateRange: DateRange) => {
+                      const count = countInOfficeDaysInRange(dateRange);
+                      return (
+                        <li>{dateFormatter.format(dateRange.start)} - {dateFormatter.format(dateRange.end)}: {count} {count === 1 ? 'day' : 'days'}</li>
+                      )
+                    })
                   }
                 </ul>
               </>

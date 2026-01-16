@@ -4,8 +4,8 @@ import { Welcome } from "../welcome/welcome";
 // TODO: what's this do?
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "RTO Compliance Tracker" },
+    { name: "description", content: "This is an RTO compliance tracker application which helps employees track their compliance with company policies." },
   ];
 }
 
