@@ -1,45 +1,142 @@
-import logoDark from "./logo-dark.svg";
-import logoLight from "./logo-light.svg";
+import { useState, useEffect, useRef, useCallback, type ChangeEvent } from "react";
+import { DatePicker, DatePickerInput } from '@mantine/dates';
+import { Button } from '@mantine/core';
+import { getCompliance, type GetComplianceResult, type DateRange } from "~/utils/compliance";
+import dayjs from "dayjs";
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore' // ES 2015
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
 
 export function Welcome() {
+  // TODO: support locale input
+  const dateFormatter = new Intl.DateTimeFormat();
+
+  const [calculationDate, setCalculationDate] = useState<string>(dayjs().format('YYYY-MM-DD'));
+  const [inOfficeDays, setInOfficeDays] = useState<string[]>([]); // mantine uses the format YYYY-MM-DD ex. 2026-01-07
+  const [userHasSubmitted, setUserHasSubmitted] = useState<boolean>(false);
+  const [alignment, setAlignment] = useState<GetComplianceResult>({
+    isCompliant: false,
+    includedWeeks: [],
+    period: {
+      start: new Date(),
+      end: new Date()
+    }
+  });
+
+  const saveToLocalStorage = useCallback(() => {
+    localStorage.setItem('calculationDate', calculationDate);
+    localStorage.setItem('inOfficeDays', JSON.stringify(inOfficeDays));
+  }, [calculationDate, inOfficeDays]);
+
+  useEffect(() => {
+    const savedCalcDate = localStorage.getItem('calculationDate');
+    const savedInOfficeDays = localStorage.getItem('inOfficeDays');
+    if (savedCalcDate) setCalculationDate(savedCalcDate);
+    if (savedInOfficeDays) setInOfficeDays(JSON.parse(savedInOfficeDays));
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveToLocalStorage();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveToLocalStorage]);
+
+  const handleChangeCalculationDate = (d: string | null) => {
+    console.log(d);
+    setCalculationDate(d || '2025-07-27');
+  }
+
+  const handleSubmit = () => {
+    console.log(calculationDate)
+    console.log(inOfficeDays)
+    const GetComplianceResult: GetComplianceResult = getCompliance(
+      new Date(calculationDate),
+      inOfficeDays.map(dateString => new Date(dateString)),
+      12
+    )
+    
+    setUserHasSubmitted(true);
+    setAlignment(GetComplianceResult);
+  }
+
+  const countInOfficeDaysInRange = (dateRange: DateRange): number => {
+    const { start, end } = dateRange;
+    return inOfficeDays.filter(dayStr => {
+      const day = dayjs(dayStr);
+      return day.isSameOrAfter(dayjs(start), 'day') && day.isSameOrBefore(dayjs(end), 'day');
+    }).length;
+  }
+
+  const {isCompliant, period, includedWeeks} = alignment;
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
-        <header className="flex flex-col items-center gap-9">
-          <div className="w-[500px] max-w-[100vw] p-4">
-            <img
-              src={logoLight}
-              alt="React Router"
-              className="block w-full dark:hidden"
-            />
-            <img
-              src={logoDark}
-              alt="React Router"
-              className="hidden w-full dark:block"
-            />
+        <div>
+          <p>Select calculation date:</p>
+
+          <DatePickerInput
+            clearable={false}
+            label="Pick date"
+            placeholder="Pick date"
+            value={calculationDate}
+            onChange={handleChangeCalculationDate}
+          />
+        </div>
+        <div>
+          <p>Select in-office days:</p>
+          <DatePicker type="multiple" firstDayOfWeek={0} value={inOfficeDays} onChange={setInOfficeDays} />
+          <div style={{ marginTop: '10px' }}>
+            <Button variant="filled" color="red" onClick={() => {
+              if (window.confirm('Are you sure you want to clear all selected dates?')) {
+                setInOfficeDays([]);
+                setCalculationDate(dayjs().format('YYYY-MM-DD'));
+              }
+            }}>Clear All Dates</Button>
           </div>
-        </header>
-        <div className="max-w-[300px] w-full space-y-6 px-4">
-          <nav className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700 space-y-4">
-            <p className="leading-6 text-gray-700 dark:text-gray-200 text-center">
-              What&apos;s next?
-            </p>
-            <ul>
-              {resources.map(({ href, text, icon }) => (
-                <li key={href}>
-                  <a
-                    className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {icon}
-                    {text}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
+        </div>
+        <div>
+          <button type="button" onClick={handleSubmit}>Do I meet the policy?</button>
+        </div>
+        <div>
+          {
+            userHasSubmitted && (
+              isCompliant
+                ? <p>You meet the policy!</p>
+                : <p>You don't meet the policy. Uh oh!</p>
+            )
+          }
+          {
+            userHasSubmitted && (
+              // TODO -- there is a bug with this day calculation -- need to add to calculation response and use instead of relying on live state
+              <p>Total in-office days: {inOfficeDays.length}</p>
+            )
+          }
+          <br />
+          {
+            userHasSubmitted && (
+              <p>Period: {dateFormatter.format(period.start)} - {dateFormatter.format(period.end)}</p>
+            )
+          }
+          <br />
+          {
+            userHasSubmitted && 
+              <>
+                <p>Dates used:</p>
+                <ul>
+                  {
+                    includedWeeks.map((dateRange: DateRange) => {
+                      const count = countInOfficeDaysInRange(dateRange);
+                      return (
+                        <li>{dateFormatter.format(dateRange.start)} - {dateFormatter.format(dateRange.end)}: {count} {count === 1 ? 'day' : 'days'}</li>
+                      )
+                    })
+                  }
+                </ul>
+              </>
+          }
         </div>
       </div>
     </main>
